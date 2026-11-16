@@ -1,0 +1,156 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apuntes Escolares</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
+    #auth-screen, #chat-screen { display: flex; flex-direction: column; height: 100%; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
+    #chat-screen { display: none; justify-content: flex-start; }
+    input, button { padding: 12px; margin: 8px 0; width: 100%; max-width: 350px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+    button { background: #075e54; color: white; border: none; font-weight: bold; cursor: pointer; }
+    #messages { flex: 1; width: 100%; max-width: 600px; overflow-y: auto; background: white; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .msg { padding: 8px 12px; border-radius: 8px; max-width: 75%; word-break: break-word; }
+    .msg.mine { background: #dcf8c6; align-self: flex-end; }
+    .msg.theirs { background: #fff; align-self: flex-start; border: 1px solid #eee; }
+    #input-box { display: flex; width: 100%; max-width: 600px; gap: 8px; }
+  </style>
+</head>
+<body>
+
+
+  <!-- Pantalla de Inicio / PIN -->
+  <div id="auth-screen">
+    <h2>Acceso a Apuntes</h2>
+    <input type="text" id="apodo" placeholder="Tu Apodo">
+    <input type="password" id="codigo" placeholder="PIN Secreto">
+    <button onclick="entrarApp()">Entrar</button>
+  </div>
+
+
+  <!-- Pantalla de Chat -->
+  <div id="chat-screen">
+    <div id="messages"></div>
+    <div id="input-box">
+      <input type="text" id="mensaje-texto" placeholder="Escribe un mensaje..." onkeypress="if(event.key==='Enviar') enviarMensaje()">
+      <button onclick="enviarMensaje()">➤</button>
+    </div>
+  </div>
+
+
+  <script>
+    // Tus credenciales de Supabase
+    const SUPABASE_URL = 'https://fjjtmdpueghuhkgiqkh.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_l9oOt9aY7iytOK0r5ZQgRg_56wZ5MPY'; // Pega tu llave de Supabase aquí entre las comillas
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+
+    let usuarioActual = null;
+
+
+    async function entrarApp() {
+      const apodo = document.getElementById('apodo').value.trim();
+      const codigo = document.getElementById('codigo').value.trim();
+      if (!apodo || !codigo) return alert('Rellena todo, manito');
+
+
+      // Registro o login rápido simulado por código PIN
+      let { data: perfil, error } = await supabaseClient
+        .from('perfiles')
+        .select('*')
+        .eq('codigo_amigo', codigo)
+        .single();
+
+
+      if (!perfil) {
+        // Crear usuario nuevo si no existe
+        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+          email: `${codigo}@chat.local`,
+          password: codigo
+        });
+        
+        if (authError) {
+          // Si ya existe en auth, intentamos iniciar sesión
+          await supabaseClient.auth.signInWithPassword({ email: `${codigo}@chat.local`, password: codigo });
+        }
+
+
+        const user = (await supabaseClient.auth.getUser()).data.user;
+        if (user) {
+          const { data: nuevoPerfil } = await supabaseClient.from('perfiles').insert([
+            { id: user.id, apodo: apodo, codigo_amigo: codigo }
+          ]).select().single();
+          usuarioActual = nuevoPerfil;
+        }
+      } else {
+        usuarioActual = perfil;
+      }
+
+
+      if (usuarioActual) {
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('chat-screen').style.display = 'flex';
+        cargarMensajes();
+        suscribirRealtime();
+      }
+    }
+
+
+    async function cargarMensajes() {
+      const { data } = await supabaseClient
+        .from('mensajes')
+        .select('*')
+        .order('creado_en', { ascending: true });
+
+
+      const contenedor = document.getElementById('messages');
+      contenedor.innerHTML = '';
+      if (data) {
+        data.forEach(m => mostrarMensaje(m));
+      }
+    }
+
+
+    function mostrarMensaje(m) {
+      const contenedor = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = `msg ${m.remitente_id === usuarioActual.id ? 'mine' : 'theirs'}`;
+      div.textContent = m.texto;
+      contenedor.appendChild(div);
+      contenedor.scrollTop = contenedor.scrollHeight;
+    }
+
+
+    async function enviarMensaje() {
+      const input = document.getElementById('mensaje-texto');
+      const texto = input.value.trim();
+      if (!texto) return;
+
+
+      await supabaseClient.from('mensajes').insert([
+        { remitente_id: usuarioActual.id, destinatario_id: usuarioActual.id, texto: texto }
+      ]);
+      input.value = '';
+    }
+
+
+    function suscribirRealtime() {
+      supabaseClient
+        .channel('public:mensajes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
+          mostrarMensaje(payload.new);
+        })
+        .subscribe();
+    }
+
+
+    // Registrar Service Worker para PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
