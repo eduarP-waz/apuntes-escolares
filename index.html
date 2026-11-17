@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -7,150 +7,392 @@
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; }
-    #auth-screen, #chat-screen { display: flex; flex-direction: column; height: 100%; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-    #chat-screen { display: none; justify-content: flex-start; }
-    input, button { padding: 12px; margin: 8px 0; width: 100%; max-width: 350px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
-    button { background: #075e54; color: white; border: none; font-weight: bold; cursor: pointer; }
-    #messages { flex: 1; width: 100%; max-width: 600px; overflow-y: auto; background: white; border-radius: 8px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
-    .msg { padding: 8px 12px; border-radius: 8px; max-width: 75%; word-break: break-word; }
-    .msg.mine { background: #dcf8c6; align-self: flex-end; }
-    .msg.theirs { background: #fff; align-self: flex-start; border: 1px solid #eee; }
-    #input-box { display: flex; width: 100%; max-width: 600px; gap: 8px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: #0b132b; color: #ffffff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    
+    /* Pantallas */
+    .screen { display: none; flex-direction: column; height: 100%; width: 100%; }
+    .active { display: flex; }
+
+    /* Login / Registro */
+    #auth-screen { justify-content: center; align-items: center; padding: 24px; gap: 14px; }
+    #auth-screen h2 { font-weight: 500; letter-spacing: 0.5px; margin-bottom: 10px; color: #e0e6ed; }
+    .avatar-upload { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+    .avatar-preview { width: 80px; height: 80px; border-radius: 50%; background: #1c2541; border: 2px dashed #3a506b; display: flex; align-items: center; justify-content: center; overflow: hidden; object-fit: cover; color: #8d99ae; font-size: 12px; text-align: center; }
+    input[type="text"], input[type="password"] { width: 100%; max-width: 320px; padding: 14px; border-radius: 10px; border: 1px solid #1c2541; background: #1c2541; color: white; font-size: 15px; outline: none; }
+    input:focus { border-color: #5bc0be; }
+    .btn-primary { width: 100%; max-width: 320px; padding: 14px; border-radius: 10px; border: none; background: #3a506b; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+    .btn-primary:hover { background: #5bc0be; color: #0b132b; }
+    .toggle-auth { font-size: 13px; color: #8d99ae; cursor: pointer; margin-top: 8px; text-decoration: underline; }
+
+    /* Menú Principal */
+    .header { background: #1c2541; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .dots-btn { background: none; border: none; color: white; font-size: 22px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+    .dots-btn:hover { background: #3a506b; }
+    #empty-state { flex: 1; display: flex; justify-content: center; align-items: center; color: #6c7a9c; font-size: 16px; }
+    #chat-list { flex: 1; overflow-y: auto; display: none; flex-direction: column; }
+    .chat-item { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid #1c2541; cursor: pointer; transition: 0.15s; }
+    .chat-item:hover { background: #1c2541; }
+    .chat-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #3a506b; }
+    .fab-btn { position: fixed; bottom: 24px; right: 24px; width: 58px; height: 58px; border-radius: 50%; background: #5bc0be; color: #0b132b; border: none; font-size: 30px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+
+    /* Modales (Código propio y Añadir amigo) */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; padding: 20px; z-index: 100; }
+    .modal-box { background: #1c2541; padding: 24px; border-radius: 14px; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 14px; text-align: center; }
+    .code-display { background: #0b132b; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 18px; letter-spacing: 2px; color: #5bc0be; user-select: all; }
+
+    /* Pantalla de Chat */
+    #messages-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 15px; line-height: 1.4; word-wrap: break-word; }
+    .msg.mine { background: #3a506b; align-self: flex-end; border-bottom-right-radius: 2px; }
+    .msg.theirs { background: #1c2541; align-self: flex-start; border-bottom-left-radius: 2px; }
+    .msg img, .msg video { max-width: 100%; border-radius: 8px; margin-top: 4px; display: block; }
+    .chat-input-bar { background: #1c2541; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+    .chat-input-bar input[type="text"] { flex: 1; max-width: none; background: #0b132b; padding: 12px; }
+    .icon-btn { background: none; border: none; color: #5bc0be; font-size: 22px; cursor: pointer; padding: 6px; }
   </style>
 </head>
 <body>
 
-
-  <!-- Pantalla de Inicio / PIN -->
-  <div id="auth-screen">
-    <h2>Acceso a Apuntes</h2>
+  <!-- 1. PANTALLA LOGIN / REGISTRO / BLOQUEO -->
+  <div id="auth-screen" class="screen active">
+    <h2 id="auth-title">Crear Perfil</h2>
+    <label class="avatar-upload" id="avatar-container">
+      <img id="avatar-preview" class="avatar-preview" src="" alt="Foto" style="display:none;">
+      <div id="avatar-placeholder" class="avatar-preview">+ Foto</div>
+      <input type="file" id="foto-input" accept="image/*" style="display:none;" onchange="previsualizarFoto(event)">
+    </label>
     <input type="text" id="apodo" placeholder="Tu Apodo">
-    <input type="password" id="codigo" placeholder="PIN Secreto">
-    <button onclick="entrarApp()">Entrar</button>
+    <input type="password" id="clave" placeholder="Tu Contraseña">
+    <button class="btn-primary" onclick="procesarAcceso()" id="auth-btn">Entrar</button>
+    <span class="toggle-auth" onclick="alternarModoAuth()" id="toggle-text">¿Ya tienes cuenta? Inicia sesión</span>
   </div>
 
+  <!-- 2. MENÚ PRINCIPAL -->
+  <div id="menu-screen" class="screen">
+    <div class="header">
+      <div class="header-left">
+        <button class="dots-btn" onclick="abrirModal('modal-mi-codigo')">⋮</button>
+        <h3>Apuntes</h3>
+      </div>
+      <img id="mi-avatar-header" class="chat-avatar" style="width:36px; height:36px;" src="">
+    </div>
 
-  <!-- Pantalla de Chat -->
-  <div id="chat-screen">
-    <div id="messages"></div>
-    <div id="input-box">
-      <input type="text" id="mensaje-texto" placeholder="Escribe un mensaje..." onkeypress="if(event.key==='Enviar') enviarMensaje()">
-      <button onclick="enviarMensaje()">➤</button>
+    <div id="empty-state">No tienes ningún chat aún</div>
+    <div id="chat-list"></div>
+
+    <button class="fab-btn" onclick="abrirModal('modal-agregar')">+</button>
+  </div>
+
+  <!-- 3. PANTALLA DE CHAT -->
+  <div id="chat-screen" class="screen">
+    <div class="header">
+      <div class="header-left">
+        <button class="dots-btn" onclick="volverAlMenu()">←</button>
+        <img id="chat-amigo-foto" class="chat-avatar" style="width:40px; height:40px;" src="">
+        <h3 id="chat-amigo-nombre">Amigo</h3>
+      </div>
+    </div>
+    <div id="messages-box"></div>
+    <div class="chat-input-bar">
+      <label class="icon-btn">
+        📎
+        <input type="file" id="media-input" accept="image/*,video/*" style="display:none;" onchange="enviarArchivo(event)">
+      </label>
+      <input type="text" id="mensaje-texto" placeholder="Escribe un apunte..." onkeypress="if(event.key==='Enter') enviarTexto()">
+      <button class="icon-btn" onclick="enviarTexto()">➤</button>
     </div>
   </div>
 
+  <!-- MODAL: MI CÓDIGO -->
+  <div id="modal-mi-codigo" class="modal" onclick="if(event.target===this) cerrarModales()">
+    <div class="modal-box">
+      <h4>Tu Código Personal</h4>
+      <p style="font-size:13px; color:#8d99ae;">Pásale este código a tu amigo para que te añada:</p>
+      <div class="code-display" id="mi-codigo-texto">---</div>
+      <button class="btn-primary" onclick="cerrarModales()">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- MODAL: AÑADIR AMIGO -->
+  <div id="modal-agregar" class="modal" onclick="if(event.target===this) cerrarModales()">
+    <div class="modal-box">
+      <h4>Añadir Contacto</h4>
+      <input type="text" id="codigo-amigo-input" placeholder="Pega el código aquí">
+      <button class="btn-primary" onclick="agregarAmigo()">Añadir</button>
+    </div>
+  </div>
 
   <script>
-    // Tus credenciales de Supabase
     const SUPABASE_URL = 'https://fjjtmdpueghuhkgiqkh.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_l9oOt9aY7iytOK0r5ZQgRg_56wZ5MPY'; // Pega tu llave de Supabase aquí entre las comillas
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_KEY = 'sb_publishable_l9oOt9aY7iytOK0r5ZQgRg_56wZ5MPY'; // <-- REEMPLAZA ESTO CON TU CLAVE DE SUPABASE
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-
+    let esRegistro = true;
     let usuarioActual = null;
+    let amigoActual = null;
+    let archivoFotoPerfil = null;
+    let suscripcionChat = null;
 
-
-    async function entrarApp() {
-      const apodo = document.getElementById('apodo').value.trim();
-      const codigo = document.getElementById('codigo').value.trim();
-      if (!apodo || !codigo) return alert('Rellena todo, manito');
-
-
-      // Registro o login rápido simulado por código PIN
-      let { data: perfil, error } = await supabaseClient
-        .from('perfiles')
-        .select('*')
-        .eq('codigo_amigo', codigo)
-        .single();
-
-
-      if (!perfil) {
-        // Crear usuario nuevo si no existe
-        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-          email: `${codigo}@chat.local`,
-          password: codigo
-        });
-        
-        if (authError) {
-          // Si ya existe en auth, intentamos iniciar sesión
-          await supabaseClient.auth.signInWithPassword({ email: `${codigo}@chat.local`, password: codigo });
-        }
-
-
-        const user = (await supabaseClient.auth.getUser()).data.user;
-        if (user) {
-          const { data: nuevoPerfil } = await supabaseClient.from('perfiles').insert([
-            { id: user.id, apodo: apodo, codigo_amigo: codigo }
-          ]).select().single();
-          usuarioActual = nuevoPerfil;
-        }
-      } else {
-        usuarioActual = perfil;
+    // Al cargar la página, comprobamos si ya hay un usuario guardado en este dispositivo
+    window.addEventListener('DOMContentLoaded', () => {
+      const guardado = localStorage.getItem('apuntes_usuario');
+      if (guardado) {
+        usuarioActual = JSON.parse(guardado);
+        mostrarPantallaBloqueo(usuarioActual);
       }
+    });
 
-
-      if (usuarioActual) {
-        document.getElementById('auth-screen').style.display = 'none';
-        document.getElementById('chat-screen').style.display = 'flex';
-        cargarMensajes();
-        suscribirRealtime();
-      }
+    function mostrarPantallaBloqueo(user) {
+      document.getElementById('auth-title').textContent = `Hola, ${user.apodo}`;
+      document.getElementById('avatar-container').style.display = 'flex';
+      document.getElementById('avatar-preview').src = user.foto_url;
+      document.getElementById('avatar-preview').style.display = 'block';
+      document.getElementById('avatar-placeholder').style.display = 'none';
+      document.getElementById('avatar-container').style.pointerEvents = 'none';
+      
+      document.getElementById('apodo').value = user.apodo;
+      document.getElementById('apodo').style.display = 'none';
+      document.getElementById('clave').placeholder = 'Introduce tu PIN';
+      document.getElementById('auth-btn').textContent = 'Desbloquear';
+      document.getElementById('toggle-text').style.display = 'none';
     }
 
+    function alternarModoAuth() {
+      esRegistro = !esRegistro;
+      document.getElementById('auth-title').textContent = esRegistro ? 'Crear Perfil' : 'Iniciar Sesión';
+      document.getElementById('avatar-container').style.display = esRegistro ? 'flex' : 'none';
+      document.getElementById('apodo').style.display = 'block';
+      document.getElementById('toggle-text').textContent = esRegistro ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Crea tu perfil';
+    }
 
-    async function cargarMensajes() {
-      const { data } = await supabaseClient
-        .from('mensajes')
+    function previsualizarFoto(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      archivoFotoPerfil = file;
+      const preview = document.getElementById('avatar-preview');
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = 'block';
+      document.getElementById('avatar-placeholder').style.display = 'none';
+    }
+
+    function generarCodigoUnico() {
+      return 'AP-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
+    async function procesarAcceso() {
+      const clave = document.getElementById('clave').value.trim();
+      if (!clave) return alert('Introduce tu contraseña o PIN, compadre.');
+
+      if (usuarioActual && usuarioActual.apodo) {
+        if (clave !== usuarioActual.clave) return alert('PIN incorrecto.');
+        iniciarMenuPrincipal();
+        return;
+      }
+
+      const apodo = document.getElementById('apodo').value.trim();
+      if (!apodo) return alert('Rellena tu apodo.');
+
+      const btn = document.getElementById('auth-btn');
+      btn.textContent = 'Cargando...';
+
+      if (esRegistro) {
+        let fotoUrl = 'https://ui-avatars.com/api/?background=3a506b&color=fff&name=' + encodeURIComponent(apodo);
+        
+        if (archivoFotoPerfil) {
+          const nombreArchivo = `perfil_${Date.now()}_${archivoFotoPerfil.name}`;
+          const { error: uploadErr } = await db.storage.from('multimedia').upload(nombreArchivo, archivoFotoPerfil);
+          if (!uploadErr) {
+            const { data } = db.storage.from('multimedia').getPublicUrl(nombreArchivo);
+            fotoUrl = data.publicUrl;
+          }
+        }
+
+        const codigoUnico = generarCodigoUnico();
+        const { data, error } = await db.from('perfiles').insert([
+          { apodo, clave, foto_url: fotoUrl, codigo_amigo: codigoUnico }
+        ]).select().single();
+
+        if (error) {
+          btn.textContent = 'Entrar';
+          return alert('Ese apodo ya existe o hubo un error. Prueba otro.');
+        }
+        usuarioActual = data;
+      } else {
+        const { data, error } = await db.from('perfiles')
+          .select('*')
+          .eq('apodo', apodo)
+          .eq('clave', clave)
+          .single();
+
+        if (error || !data) {
+          btn.textContent = 'Entrar';
+          return alert('Apodo o contraseña incorrectos.');
+        }
+        usuarioActual = data;
+      }
+
+      localStorage.setItem('apuntes_usuario', JSON.stringify(usuarioActual));
+      iniciarMenuPrincipal();
+    }
+
+    function iniciarMenuPrincipal() {
+      document.getElementById('auth-screen').classList.remove('active');
+      document.getElementById('menu-screen').classList.add('active');
+      document.getElementById('mi-codigo-texto').textContent = usuarioActual.codigo_amigo;
+      document.getElementById('mi-avatar-header').src = usuarioActual.foto_url;
+      cargarListaChats();
+    }
+
+    async function cargarListaChats() {
+      const { data: contactos } = await db.from('contactos')
+        .select('amigo_id, perfiles!contactos_amigo_id_fkey(*)')
+        .eq('usuario_id', usuarioActual.id);
+
+      const lista = document.getElementById('chat-list');
+      const vacio = document.getElementById('empty-state');
+      lista.innerHTML = '';
+
+      if (!contactos || contactos.length === 0) {
+        vacio.style.display = 'flex';
+        lista.style.display = 'none';
+        return;
+      }
+
+      vacio.style.display = 'none';
+      lista.style.display = 'flex';
+
+      contactos.forEach(c => {
+        const amigo = c.perfiles;
+        if (!amigo) return;
+        const item = document.createElement('div');
+        item.className = 'chat-item';
+        item.innerHTML = `
+          <img class="chat-avatar" src="${amigo.foto_url}" alt="Foto">
+          <div>
+            <div style="font-weight:600; font-size:16px;">${amigo.apodo}</div>
+            <div style="font-size:12px; color:#8d99ae;">Toca para abrir chat</div>
+          </div>
+        `;
+        item.onclick = () => abrirChat(amigo);
+        lista.appendChild(item);
+      });
+    }
+
+    async function agregarAmigo() {
+      const codigo = document.getElementById('codigo-amigo-input').value.trim().toUpperCase();
+      if (!codigo) return;
+      if (codigo === usuarioActual.codigo_amigo) return alert('No puedes agregarte a ti mismo.');
+
+      const { data: amigo } = await db.from('perfiles').select('*').eq('codigo_amigo', codigo).single();
+      if (!amigo) return alert('No existe nadie con ese código.');
+
+      await db.from('contactos').upsert([
+        { usuario_id: usuarioActual.id, amigo_id: amigo.id },
+        { usuario_id: amigo.id, amigo_id: usuarioActual.id }
+      ]);
+
+      document.getElementById('codigo-amigo-input').value = '';
+      cerrarModales();
+      cargarListaChats();
+    }
+
+    function abrirChat(amigo) {
+      amigoActual = amigo;
+      document.getElementById('menu-screen').classList.remove('active');
+      document.getElementById('chat-screen').classList.add('active');
+      document.getElementById('chat-amigo-nombre').textContent = amigo.apodo;
+      document.getElementById('chat-amigo-foto').src = amigo.foto_url;
+      cargarMensajesChat();
+    }
+
+    function volverAlMenu() {
+      if (suscripcionChat) db.removeChannel(suscripcionChat);
+      document.getElementById('chat-screen').classList.remove('active');
+      document.getElementById('menu-screen').classList.add('active');
+      cargarListaChats();
+    }
+
+    async function cargarMensajesChat() {
+      const box = document.getElementById('messages-box');
+      box.innerHTML = '';
+
+      const { data: msgs } = await db.from('mensajes')
         .select('*')
+        .or(`and(remitente_id.eq.${usuarioActual.id},destinatario_id.eq.${amigoActual.id}),and(remitente_id.eq.${amigoActual.id},destinatario_id.eq.${usuarioActual.id})`)
         .order('creado_en', { ascending: true });
 
+      if (msgs) msgs.forEach(renderizarMensaje);
 
-      const contenedor = document.getElementById('messages');
-      contenedor.innerHTML = '';
-      if (data) {
-        data.forEach(m => mostrarMensaje(m));
-      }
-    }
-
-
-    function mostrarMensaje(m) {
-      const contenedor = document.getElementById('messages');
-      const div = document.createElement('div');
-      div.className = `msg ${m.remitente_id === usuarioActual.id ? 'mine' : 'theirs'}`;
-      div.textContent = m.texto;
-      contenedor.appendChild(div);
-      contenedor.scrollTop = contenedor.scrollHeight;
-    }
-
-
-    async function enviarMensaje() {
-      const input = document.getElementById('mensaje-texto');
-      const texto = input.value.trim();
-      if (!texto) return;
-
-
-      await supabaseClient.from('mensajes').insert([
-        { remitente_id: usuarioActual.id, destinatario_id: usuarioActual.id, texto: texto }
-      ]);
-      input.value = '';
-    }
-
-
-    function suscribirRealtime() {
-      supabaseClient
-        .channel('public:mensajes')
+      suscripcionChat = db.channel('chat-sala-' + Math.random())
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
-          mostrarMensaje(payload.new);
+          const m = payload.new;
+          const esDeEstaConversacion = 
+            (m.remitente_id === usuarioActual.id && m.destinatario_id === amigoActual.id) ||
+            (m.remitente_id === amigoActual.id && m.destinatario_id === usuarioActual.id);
+          if (esDeEstaConversacion) renderizarMensaje(m);
         })
         .subscribe();
     }
 
+    function renderizarMensaje(m) {
+      const box = document.getElementById('messages-box');
+      const div = document.createElement('div');
+      div.className = `msg ${m.remitente_id === usuarioActual.id ? 'mine' : 'theirs'}`;
 
-    // Registrar Service Worker para PWA
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
+      if (m.archivo_url) {
+        if (m.tipo_archivo && m.tipo_archivo.startsWith('video/')) {
+          div.innerHTML = `<video src="${m.archivo_url}" controls></video>`;
+        } else {
+          div.innerHTML = `<img src="${m.archivo_url}" alt="Adjunto">`;
+        }
+      }
+      if (m.texto) {
+        const p = document.createElement('div');
+        p.textContent = m.texto;
+        div.appendChild(p);
+      }
+
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
     }
+
+    async function enviarTexto() {
+      const input = document.getElementById('mensaje-texto');
+      const texto = input.value.trim();
+      if (!texto) return;
+      input.value = '';
+
+      await db.from('mensajes').insert([{
+        remitnet_id: usuarioActual.id,
+        destinatario_id: amigoActual.id,
+        texto: texto
+      }]);
+    }
+
+    async function enviarArchivo(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const nombre = `chat_${Date.now()}_${file.name}`;
+      const { error } = await db.storage.from('multimedia').upload(nombre, file);
+      if (error) return alert('Error al subir el archivo (máx 50 MB).');
+
+      const { data } = db.storage.from('multimedia').getPublicUrl(nombre);
+
+      await db.from('mensajes').insert([{
+        remitente_id: usuarioActual.id,
+        destinatario_id: amigoActual.id,
+        archivo_url: data.publicUrl,
+        tipo_archivo: file.type
+      }]);
+    }
+
+    function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function cerrarModales() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   </script>
 </body>
 </html>
