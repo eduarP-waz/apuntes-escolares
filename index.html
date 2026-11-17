@@ -365,7 +365,7 @@
       input.value = '';
 
       await db.from('mensajes').insert([{
-        remitnet_id: usuarioActual.id,
+        remitente_id: usuarioActual.id,
         destinatario_id: amigoActual.id,
         texto: texto
       }]);
