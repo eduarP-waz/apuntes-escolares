@@ -37,23 +37,45 @@
     .chat-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: #3a506b; }
     .fab-btn { position: fixed; bottom: 24px; right: 24px; width: 58px; height: 58px; border-radius: 50%; background: #5bc0be; color: #0b132b; border: none; font-size: 30px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
 
-    /* Modales (Código propio y Añadir amigo) */
+    /* Modales */
     .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; padding: 20px; z-index: 100; }
     .modal-box { background: #1c2541; padding: 24px; border-radius: 14px; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 14px; text-align: center; }
     .code-display { background: #0b132b; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 18px; letter-spacing: 2px; color: #5bc0be; user-select: all; }
 
     /* Pantalla de Chat */
     #messages-box { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-    .msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 15px; line-height: 1.4; word-wrap: break-word; }
+    .msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 15px; line-height: 1.4; word-wrap: break-word; position: relative; }
     .msg.mine { background: #3a506b; align-self: flex-end; border-bottom-right-radius: 2px; }
     .msg.theirs { background: #1c2541; align-self: flex-start; border-bottom-left-radius: 2px; }
     .msg img, .msg video { max-width: 100%; border-radius: 8px; margin-top: 4px; display: block; }
-    .chat-input-bar { background: #1c2541; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+    
+    /* Estilos de Stickers y Respuestas Citadas */
+    .sticker-container { display: inline-block; cursor: pointer; }
+    .sticker-img { width: 110px; height: 110px; object-fit: contain; background: transparent; display: block; }
+    .quoted-reply { background: rgba(0, 0, 0, 0.25); border-left: 3px solid #5bc0be; padding: 4px 8px; margin-bottom: 6px; border-radius: 4px; font-size: 12px; color: #8d99ae; }
+
+    /* Panel de Stickers */
+    #sticker-panel { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); justify-content: flex-end; flex-direction: column; z-index: 100; }
+    .sticker-drawer { background: #1c2541; border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 20px; max-height: 50vh; display: flex; flex-direction: column; gap: 14px; }
+    .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; overflow-y: auto; max-height: 30vh; padding: 4px; }
+    .sticker-item { width: 100%; aspect-ratio: 1; background: #0b132b; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; border: 1px solid #3a506b; position: relative; }
+    .sticker-item img { width: 100%; height: 100%; object-fit: contain; }
+    .add-sticker-btn { border: 2px dashed #5bc0be; background: transparent; color: #5bc0be; font-size: 24px; font-weight: bold; }
+
+    /* Menú Contextual (Borrar / Responder) */
+    .msg-menu { display: none; position: absolute; background: #1c2541; border: 1px solid #3a506b; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 150; overflow: hidden; }
+    .msg-menu button { display: block; width: 100%; padding: 10px 16px; background: none; border: none; color: white; text-align: left; font-size: 14px; cursor: pointer; }
+    .msg-menu button:hover { background: #3a506b; }
+
+    /* Barra Inferior y Caja de Respuesta */
+    .chat-input-container { background: #1c2541; display: flex; flex-direction: column; }
+    #reply-box { display: none; background: #0b132b; padding: 8px 12px; border-left: 4px solid #5bc0be; font-size: 13px; color: #8d99ae; justify-content: space-between; align-items: center; border-radius: 4px; margin: 8px 14px 0 14px; }
+    .chat-input-bar { padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
     .chat-input-bar input[type="text"] { flex: 1; max-width: none; background: #0b132b; padding: 12px; }
     .icon-btn { background: none; border: none; color: #5bc0be; font-size: 22px; cursor: pointer; padding: 6px; }
   </style>
 </head>
-<body>
+<body onclick="cerrarMenuMensaje()">
 
   <!-- 1. PANTALLA LOGIN / REGISTRO / BLOQUEO -->
   <div id="auth-screen" class="screen active">
@@ -94,14 +116,23 @@
         <h3 id="chat-amigo-nombre">Amigo</h3>
       </div>
     </div>
+    
     <div id="messages-box"></div>
-    <div class="chat-input-bar">
-      <label class="icon-btn">
-        📎
-        <input type="file" id="media-input" accept="image/*,video/*" style="display:none;" onchange="enviarArchivo(event)">
-      </label>
-      <input type="text" id="mensaje-texto" placeholder="Escribe un apunte..." onkeypress="if(event.key==='Enter') enviarTexto()">
-      <button class="icon-btn" onclick="enviarTexto()">➤</button>
+    
+    <div class="chat-input-container">
+      <div id="reply-box">
+        <span id="reply-text-preview">Respondiendo a...</span>
+        <button onclick="cancelarRespuesta()" style="background:none; border:none; color:white; cursor:pointer;">✕</button>
+      </div>
+      <div class="chat-input-bar">
+        <label class="icon-btn" title="Adjuntar archivo">
+          📎
+          <input type="file" id="media-input" accept="image/*,video/*" style="display:none;" onchange="enviarArchivo(event)">
+        </label>
+        <button class="icon-btn" onclick="abrirPanelStickers()" title="Stickers">⭐</button>
+        <input type="text" id="mensaje-texto" placeholder="Escribe un apunte..." onkeypress="if(event.key==='Enter') enviarTexto()">
+        <button class="icon-btn" onclick="enviarTexto()">➤</button>
+      </div>
     </div>
   </div>
 
@@ -124,9 +155,30 @@
     </div>
   </div>
 
+  <!-- PANEL / CAJÓN DE STICKERS -->
+  <div id="sticker-panel" class="modal" onclick="if(event.target===this) cerrarPanelStickers()">
+    <div class="sticker-drawer" style="width:100%; max-width:400px; margin:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h4 style="font-size:16px;">Tus Stickers</h4>
+        <button onclick="cerrarPanelStickers()" style="background:none; border:none; color:white; font-size:18px; cursor:pointer;">✕</button>
+      </div>
+      <div class="sticker-grid" id="sticker-grid">
+        <label class="sticker-item add-sticker-btn" title="Añadir sticker">
+          +
+          <input type="file" accept="image/*" style="display:none;" onchange="agregarStickerLocal(event)">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- MENÚ FLOTANTE PARA MENSAJES -->
+  <div id="msg-context-menu" class="msg-menu" onclick="event.stopPropagation()">
+    <button onclick="menuAccionResponder()">Responder</button>
+    <button id="btn-menu-borrar" onclick="menuAccionBorrar()" style="color: #ff6b6b;">Borrar</button>
+  </div>
   <script>
-    const SUPABASE_URL = 'https://fjjtmdpuekghuhkgiqkh.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_l9oOt9aY7iytOK0r5ZQgRg_56wZ5MPY'; // <-- REEMPLAZA ESTO CON TU CLAVE DE SUPABASE
+    const SUPABASE_URL = 'https://fjjtmdpueghuhkgiqkh.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_l9oOt9aY7iytOK0r5ZQgRg_56wZ5MPY';
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let esRegistro = true;
@@ -135,7 +187,10 @@
     let archivoFotoPerfil = null;
     let suscripcionChat = null;
 
-    // Al cargar la página, comprobamos si ya hay un usuario guardado en este dispositivo
+    let mensajeSeleccionadoId = null;
+    let mensajeSeleccionadoObjeto = null;
+    let mensajeRespondidoId = null;
+
     window.addEventListener('DOMContentLoaded', () => {
       const guardado = localStorage.getItem('apuntes_usuario');
       if (guardado) {
@@ -323,15 +378,25 @@
         .or(`and(remitente_id.eq.${usuarioActual.id},destinatario_id.eq.${amigoActual.id}),and(remitente_id.eq.${amigoActual.id},destinatario_id.eq.${usuarioActual.id})`)
         .order('creado_en', { ascending: true });
 
-      if (msgs) msgs.forEach(renderizarMensaje);
+      window._mensajesCache = {};
+      if (msgs) {
+        msgs.forEach(m => window._mensajesCache[m.id] = m);
+        msgs.forEach(renderizarMensaje);
+      }
+
+      if (suscripcionChat) db.removeChannel(suscripcionChat);
 
       suscripcionChat = db.channel('chat-sala-' + Math.random())
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
           const m = payload.new;
+          window._mensajesCache[m.id] = m;
           const esDeEstaConversacion = 
             (m.remitente_id === usuarioActual.id && m.destinatario_id === amigoActual.id) ||
             (m.remitente_id === amigoActual.id && m.destinatario_id === usuarioActual.id);
           if (esDeEstaConversacion) renderizarMensaje(m);
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'mensajes' }, () => {
+          cargarMensajesChat();
         })
         .subscribe();
     }
@@ -340,22 +405,120 @@
       const box = document.getElementById('messages-box');
       const div = document.createElement('div');
       div.className = `msg ${m.remitente_id === usuarioActual.id ? 'mine' : 'theirs'}`;
+      div.id = `msg-${m.id}`;
 
-      if (m.archivo_url) {
+      div.oncontextmenu = (e) => mostrarMenuMensaje(e, m);
+
+      let contenidoHTML = '';
+
+      if (m.respondido_a && window._mensajesCache && window._mensajesCache[m.respondido_a]) {
+        const original = window._mensajesCache[m.respondido_a];
+        let previewTexto = original.texto || (original.tipo_archivo === 'image/sticker' ? 'Sticker' : 'Archivo multimedia');
+        contenidoHTML += `<div class="quoted-reply">Respuesta a: "${previewTexto}"</div>`;
+      }
+
+      if (m.tipo_archivo === 'image/sticker') {
+        contenidoHTML += `
+          <div class="sticker-container" onclick="gestionarStickerRecibido('${m.archivo_url}')">
+            <img src="${m.archivo_url}" class="sticker-img" alt="Sticker">
+          </div>
+        `;
+      } else if (m.archivo_url) {
         if (m.tipo_archivo && m.tipo_archivo.startsWith('video/')) {
-          div.innerHTML = `<video src="${m.archivo_url}" controls></video>`;
+          contenidoHTML += `<video src="${m.archivo_url}" controls style="max-width:200px; max-height:200px; border-radius:8px;"></video>`;
         } else {
-          div.innerHTML = `<img src="${m.archivo_url}" alt="Adjunto">`;
+          contenidoHTML += `<img src="${m.archivo_url}" alt="Adjunto" style="max-width:200px; max-height:200px; border-radius:8px; object-fit:cover;">`;
         }
       }
+
       if (m.texto) {
-        const p = document.createElement('div');
-        p.textContent = m.texto;
-        div.appendChild(p);
+        contenidoHTML += `<div>${escapeHtml(m.texto)}</div>`;
       }
 
+      div.innerHTML = contenidoHTML;
       box.appendChild(div);
       box.scrollTop = box.scrollHeight;
+    }
+
+    function abrirPanelStickers() {
+      document.getElementById('sticker-panel').style.display = 'flex';
+      cargarStickersLocales();
+    }
+    function cerrarPanelStickers() {
+      document.getElementById('sticker-panel').style.display = 'none';
+    }
+
+    function cargarStickersLocales() {
+      const grid = document.getElementById('sticker-grid');
+      grid.innerHTML = `
+        <label class="sticker-item add-sticker-btn" title="Añadir sticker">
+          +
+          <input type="file" accept="image/*" style="display:none;" onchange="agregarStickerLocal(event)">
+        </label>
+      `;
+
+      let stickers = JSON.parse(localStorage.getItem('apuntes_stickers') || '[]');
+      stickers.forEach((url, index) => {
+        const item = document.createElement('div');
+        item.className = 'sticker-item';
+        item.innerHTML = `<img src="${url}" alt="Sticker">`;
+        
+        item.onclick = () => enviarSticker(url);
+        
+        item.oncontextmenu = (e) => {
+          e.preventDefault();
+          if (confirm('¿Borrar este sticker de tu colección?')) {
+            borrarStickerLocal(index);
+          }
+        };
+
+        grid.appendChild(item);
+      });
+    }
+
+    function agregarStickerLocal(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const base64String = event.target.result;
+        let stickers = JSON.parse(localStorage.getItem('apuntes_stickers') || '[]');
+        stickers.push(base64String);
+        localStorage.setItem('apuntes_stickers', JSON.stringify(stickers));
+        cargarStickersLocales();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function borrarStickerLocal(index) {
+      let stickers = JSON.parse(localStorage.getItem('apuntes_stickers') || '[]');
+      stickers.splice(index, 1);
+      localStorage.setItem('apuntes_stickers', JSON.stringify(stickers));
+      cargarStickersLocales();
+    }
+
+    async function enviarSticker(url) {
+      cerrarPanelStickers();
+      await db.from('mensajes').insert([{
+        remitente_id: usuarioActual.id,
+        destinatario_id: amigoActual.id,
+        archivo_url: url,
+        tipo_archivo: 'image/sticker',
+        respondido_a: mensajeRespondidoId
+      }]);
+      cancelarRespuesta();
+    }
+
+    function gestionarStickerRecibido(url) {
+      let stickers = JSON.parse(localStorage.getItem('apuntes_stickers') || '[]');
+      if (stickers.includes(url)) return;
+
+      if (confirm('¿Guardar sticker?')) {
+        stickers.push(url);
+        localStorage.setItem('apuntes_stickers', JSON.stringify(stickers));
+        alert('¡Sticker guardado en tu colección con éxito! ⭐');
+      }
     }
 
     async function enviarTexto() {
@@ -367,8 +530,10 @@
       await db.from('mensajes').insert([{
         remitente_id: usuarioActual.id,
         destinatario_id: amigoActual.id,
-        texto: texto
+        texto: texto,
+        respondido_a: mensajeRespondidoId
       }]);
+      cancelarRespuesta();
     }
 
     async function enviarArchivo(e) {
@@ -385,13 +550,88 @@
         remitente_id: usuarioActual.id,
         destinatario_id: amigoActual.id,
         archivo_url: data.publicUrl,
-        tipo_archivo: file.type
+        tipo_archivo: file.type,
+        respondido_a: mensajeRespondidoId
       }]);
+      cancelarRespuesta();
+    }
+
+    function mostrarMenuMensaje(e, m) {
+      e.preventDefault();
+      mensajeSeleccionadoId = m.id;
+      mensajeSeleccionadoObjeto = m;
+
+      const menu = document.getElementById('msg-context-menu');
+      let opcionesHtml = `<button onclick="menuAccionResponder()">Responder</button>`;
+
+      if (m.remitente_id === usuarioActual.id) {
+        opcionesHtml += `<button onclick="menuAccionBorrar()" style="color: #ff6b6b;">Borrar</button>`;
+      }
+
+      if (m.tipo_archivo === 'image/sticker') {
+        let stickers = JSON.parse(localStorage.getItem('apuntes_stickers') || '[]');
+        if (stickers.includes(m.archivo_url)) {
+          opcionesHtml += `<button onclick="menuAccionBorrarStickerColeccion('${m.archivo_url}')" style="color: #ffa502;">Borrar sticker de la colección</button>`;
+        }
+      }
+
+      menu.innerHTML = opcionesHtml;
+      menu.style.display = 'block';
+      menu.style.left = Math.min(e.pageX, window.innerWidth - 180) + 'px';
+      menu.style.top = Math.min(e.pageY, window.innerHeight - 120) + 'px';
+    }
+
+    function cerrarMenuMensaje() {
+      const menu = document.getElementById('msg-context-menu');
+      if (menu) menu.style.display = 'none';
+    }
+
+    function menuAccionResponder() {
+      cerrarMenuMensaje();
+      mensajeRespondidoId = mensajeSeleccionadoId;
+      let preview = mensajeSeleccionadoObjeto.texto || (mensajeSeleccionadoObjeto.tipo_archivo === 'image/sticker' ? 'Sticker' : 'Archivo multimedia');
+      document.getElementById('reply-text-preview').textContent = `Respondiendo a: "${preview}"`;
+      document.getElementById('reply-box').style.display = 'flex';
+      document.getElementById('mensaje-texto').focus();
+    }
+
+    function cancelarRespuesta() {
+      mensajeRespondidoId = null;
+      document.getElementById('reply-box').style.display = 'none';
+    }
+
+    async function menuAccionBorrar() {
+      cerrarMenuMensaje();
+      if (!confirm('¿Seguro que quieres borrar este mensaje para ambos?')) return;
+
+      const { error } = await db.from('mensajes').delete().eq('id', mensajeSeleccionadoId);
+      if (error) {
+        alert('No se pudo borrar el mensaje del servidor.');
+      } else {
+        cargarMensajesChat();
+      }
+    }
+
+    function menuAccionBorrarStickerColeccion(url) {
+      cerrarMenuMensaje();
+      let stickers = JSON.parse(localStorage.getItem('apuntes_stickers') || '[]');
+      const index = stickers.indexOf(url);
+      if (index > -1) {
+        stickers.splice(index, 1);
+        localStorage.setItem('apuntes_stickers', JSON.stringify(stickers));
+        alert('Sticker eliminado de tu colección.');
+      }
     }
 
     function abrirModal(id) { document.getElementById(id).style.display = 'flex'; }
     function cerrarModales() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
 
+    function escapeHtml(text) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+      return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   </script>
 </body>
 </html>
