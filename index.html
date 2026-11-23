@@ -944,8 +944,9 @@ $('#resp-cancelar').addEventListener('click', () => { respondiendo = null; actua
 
 /* ---------- Borrar ---------- */
 async function borrarMensaje(m) {
-  const { error } = await sb.from('mensajes').delete().eq('id', m.id).eq('remitente_id', yo.id);
+  const { data, error } = await sb.from('mensajes').delete().eq('id', m.id).eq('remitente_id', yo.id).select('id');
   if (error) { console.error(error); toast('No se pudo borrar el mensaje'); return; }
+  if (!data || !data.length) { toast('Supabase no permitió borrarlo: falta el permiso de borrado (ejecuta el SQL de permisos)', 6000); return; }
   mensajes = mensajes.filter(x => x.id !== m.id);
   mensajes.forEach(x => { if (x.responde_a === m.id) x.responde_a = null; });
   pintarMensajes();
@@ -1095,8 +1096,9 @@ $('#in-sticker').addEventListener('change', async e => {
 async function quitarStickerColeccion(url) {
   const s = stickers.find(x => x.url === url);
   if (!s) return toast('Ese sticker no está en tu colección');
-  const { error } = await sb.from('stickers').delete().eq('id', s.id);
+  const { data, error } = await sb.from('stickers').delete().eq('id', s.id).select('id');
   if (error) { console.error(error); return toast('No se pudo quitar el sticker'); }
+  if (!data || !data.length) return toast('Supabase no permitió borrar el sticker (falta permiso de borrado)', 6000);
   stickers = stickers.filter(x => x.id !== s.id);
   pintarStickers();
   toast('Sticker quitado de tu colección');
